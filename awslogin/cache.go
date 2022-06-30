@@ -20,8 +20,11 @@ func makeCache(cacheDirectory string) Cache {
 func (cache Cache) Get(accountID string, durationSeconds int32) (aws.Credentials, bool, error) {
 	var credentials aws.Credentials
 	data, err := os.ReadFile(filepath.Join(cache.cacheDirectory, "aws-login-"+accountID+".json"))
-	if err != nil && !os.IsNotExist(err) {
-		return credentials, false, err
+	if err != nil {
+        	if !os.IsNotExist(err) {
+			return credentials, false, err
+		}
+		return credentials, false, nil
 	}
 
 	if err := json.Unmarshal(data, &credentials); err != nil {

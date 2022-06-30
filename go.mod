@@ -1,6 +1,6 @@
 module github.com/garymacindoe/aws-login
 
-go 1.17
+go 1.15
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.13.0
