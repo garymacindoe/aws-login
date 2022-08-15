@@ -100,7 +100,7 @@ func (awsLogin AWSLogin) Credentials(accountID string, durationSeconds int32) (a
 	return credentials, awsLogin.cache.Put(accountID, credentials)
 }
 
-func (awsLogin AWSLogin) Console(accountID string, durationSeconds int32) (string, error) {
+func (awsLogin AWSLogin) Console(accountID, destination string, durationSeconds int32) (string, error) {
 	assumedRole, err := awsLogin.Credentials(accountID, durationSeconds)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate credentials, %v", err)
@@ -152,5 +152,5 @@ func (awsLogin AWSLogin) Console(accountID string, durationSeconds int32) (strin
 	return "https://signin.aws.amazon.com/federation" +
 		"?Action=login" +
 		"&SigninToken=" + signinToken.(string) +
-		"&Destination=https://console.aws.amazon.com/", nil
+		"&Destination=" + url.QueryEscape(destination), nil
 }

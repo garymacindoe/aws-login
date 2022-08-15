@@ -18,12 +18,14 @@ func main() {
 	var cacheDirectory = awsConfigDir
 	var configFile = filepath.Join(awsConfigDir, "aws-login.yaml")
 	var console = false
+	var destination = "https://console.aws.amazon.com/"
 	var help = false
 	var durationSeconds int32 = 3600
 
 	getopt.FlagLong(&cacheDirectory, "cache-directory", 0, "use <cache-directory> to cache credentials (default ${AWS_CONFIG_DIR})")
 	getopt.FlagLong(&configFile, "config-file", 0, "read account IDs, role ARNs and MFA device serial numbers from <config-file> (default ${AWS_CONFIG_DIR}/aws-login.yaml)")
 	getopt.FlagLong(&console, "console", 0, "print a link to the AWS console on standard output")
+	getopt.FlagLong(&destination, "destination", 0, "the AWS Console URL to redirect to after authenticating (default \"" + destination + "\")")
 	getopt.FlagLong(&help, "help", 'h', "print this help and exit")
 	getopt.FlagLong(&durationSeconds, "duration-seconds", 0, "request credentials valid for at least <duration-seconds> seconds (default 3600 seconds or 1 hour)")
 
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	if console {
-		url, err := awsLogin.Console(accountID, durationSeconds)
+		url, err := awsLogin.Console(accountID, destination, durationSeconds)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to generate console link: %v\n", err)
 			os.Exit(1)
