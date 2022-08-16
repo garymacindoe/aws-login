@@ -22,15 +22,20 @@ func main() {
 	var help = false
 	var durationSeconds int32 = 3600
 
-	getopt.FlagLong(&cacheDirectory, "cache-directory", 0, "use <cache-directory> to cache credentials (default ${AWS_CONFIG_DIR})")
+	getopt.FlagLong(&cacheDirectory, "cache-directory", 0, "use <cache-directory> to cache credentials (can be overridden by setting ${AWS_CONFIG_DIR})")
 	getopt.FlagLong(&configFile, "config-file", 0, "read account IDs, role ARNs and MFA device serial numbers from <config-file> (default ${AWS_CONFIG_DIR}/aws-login.yaml)")
 	getopt.FlagLong(&console, "console", 0, "print a link to the AWS console on standard output")
-	getopt.FlagLong(&destination, "destination", 0, "the AWS Console URL to redirect to after authenticating (default \"" + destination + "\")")
+	getopt.FlagLong(&destination, "destination", 0, "the AWS Console URL to redirect to after authenticating")
 	getopt.FlagLong(&help, "help", 'h', "print this help and exit")
-	getopt.FlagLong(&durationSeconds, "duration-seconds", 0, "request credentials valid for at least <duration-seconds> seconds (default 3600 seconds or 1 hour)")
+	getopt.FlagLong(&durationSeconds, "duration-seconds", 0, "request credentials valid for at least <duration-seconds> seconds")
 
 	getopt.Parse()
 	args := getopt.Args()
+
+	if help {
+	    getopt.Usage()
+        os.Exit(1)
+	}
 
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "missing account ID or alias")
