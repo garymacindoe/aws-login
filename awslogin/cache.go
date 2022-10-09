@@ -19,7 +19,7 @@ func makeCache(cacheDirectory string) cache {
 
 func (c cache) get(accountID string, durationSeconds int32) (aws.Credentials, bool, error) {
 	var credentials aws.Credentials
-	data, err := os.ReadFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"))
+	data, err := osReadFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"))
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return credentials, false, err
@@ -31,7 +31,7 @@ func (c cache) get(accountID string, durationSeconds int32) (aws.Credentials, bo
 		return credentials, false, err
 	}
 
-	if time.Now().Add(time.Second * time.Duration(durationSeconds)).Before(credentials.Expires) {
+	if timeNow().Add(time.Second * time.Duration(durationSeconds)).Before(credentials.Expires) {
 		return credentials, true, nil
 	}
 
@@ -44,5 +44,5 @@ func (c cache) put(accountID string, credentials aws.Credentials) error {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"), data, 0600)
+	return osWriteFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"), data, 0600)
 }

@@ -1,7 +1,6 @@
 package awslogin
 
 import (
-	"os"
 	"regexp"
 	"strconv"
 
@@ -14,7 +13,7 @@ type config struct {
 }
 
 func makeConfig(filename string) (config, error) {
-	data, err := os.ReadFile(filename)
+	data, err := osReadFile(filename)
 	if err != nil {
 		return config{}, err
 	}

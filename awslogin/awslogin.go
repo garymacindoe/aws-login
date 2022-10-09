@@ -10,11 +10,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
+
+var osReadFile = os.ReadFile
+var osWriteFile = os.WriteFile
+var timeNow = time.Now
+var awsLoadDefaultConfig = awsConfig.LoadDefaultConfig
+var stsNewFromConfig = sts.NewFromConfig
+var httpGet = http.Get
 
 type AWSLogin struct {
 	cache  cache
@@ -66,12 +74,12 @@ func (awsLogin AWSLogin) Credentials(accountID string, durationSeconds int32) (a
 		return credentials, true, nil
 	}
 
-	cfg, err := awsConfig.LoadDefaultConfig(context.TODO(), awsConfig.WithSharedConfigProfile(accountID))
+	cfg, err := awsLoadDefaultConfig(context.TODO(), awsConfig.WithSharedConfigProfile(accountID))
 	if err != nil {
 		return aws.Credentials{}, false, err
 	}
 
-	svc := sts.NewFromConfig(cfg)
+	svc := stsNewFromConfig(cfg)
 
 	if assumeRoleInput.SerialNumber != nil {
 		reader := bufio.NewReader(os.Stdin)
@@ -136,7 +144,7 @@ func (awsLogin AWSLogin) Console(accountID, destination string, durationSeconds 
 		request += "&Session=" + url.QueryEscape(string(session))
 	}
 
-	resp, err := http.Get(request)
+	resp, err := httpGet(request)
 	if err != nil {
 		return "", false, err
 	}
