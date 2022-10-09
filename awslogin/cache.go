@@ -9,19 +9,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-type Cache struct {
+type cache struct {
 	cacheDirectory string
 }
 
-func makeCache(cacheDirectory string) Cache {
-	return Cache{cacheDirectory}
+func makeCache(cacheDirectory string) cache {
+	return cache{cacheDirectory}
 }
 
-func (cache Cache) Get(accountID string, durationSeconds int32) (aws.Credentials, bool, error) {
+func (c cache) get(accountID string, durationSeconds int32) (aws.Credentials, bool, error) {
 	var credentials aws.Credentials
-	data, err := os.ReadFile(filepath.Join(cache.cacheDirectory, "aws-login-"+accountID+".json"))
+	data, err := os.ReadFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"))
 	if err != nil {
-        	if !os.IsNotExist(err) {
+		if !os.IsNotExist(err) {
 			return credentials, false, err
 		}
 		return credentials, false, nil
@@ -38,11 +38,11 @@ func (cache Cache) Get(accountID string, durationSeconds int32) (aws.Credentials
 	return credentials, false, nil
 }
 
-func (cache Cache) Put(accountID string, credentials aws.Credentials) error {
+func (c cache) put(accountID string, credentials aws.Credentials) error {
 	data, err := json.Marshal(credentials)
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(cache.cacheDirectory, "aws-login-"+accountID+".json"), data, 0600)
+	return os.WriteFile(filepath.Join(c.cacheDirectory, "aws-login-"+accountID+".json"), data, 0600)
 }

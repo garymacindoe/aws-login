@@ -1,7 +1,6 @@
 package awslogin
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -9,27 +8,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
-	accounts map[string]map[string]string
-	aliases  map[string]string
-}
-
 type config struct {
 	Accounts map[string]map[string]string
 	Aliases  map[string]string
 }
 
-func makeConfig(filename string) (Config, error) {
+func makeConfig(filename string) (config, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Config{}, err
+		return config{}, err
 	}
-	var config config
-	err = yaml.Unmarshal(data, &config)
-	return Config{config.Accounts, config.Aliases}, err
+	var c config
+	err = yaml.Unmarshal(data, &c)
+	return c, err
 }
 
-func (config Config) ResolveAccountID(accountName string) (string, error) {
+func (c config) resolveAccountID(accountName string) (string, error) {
 	matched, err := regexp.MatchString("^\\d{12}$", accountName)
 	if err != nil {
 		return "", err
@@ -39,39 +33,42 @@ func (config Config) ResolveAccountID(accountName string) (string, error) {
 		return accountName, nil
 	}
 
-	accountID, ok := config.aliases[accountName]
+	accountID, ok := c.Aliases[accountName]
 	if !ok {
-		return "", fmt.Errorf("unknown account: %s", accountName)
+		return "", &AccountError{accountName, ErrUnknownAccountAlias}
 	}
 	return accountID, nil
 }
 
-func (config Config) RoleArn(accountID string) (string, error) {
-	account, ok := config.accounts[accountID]
+func (c config) roleArn(accountID string) (string, error) {
+	account, ok := c.Accounts[accountID]
 	if ok {
 		roleArn, ok := account["role-arn"]
 		if ok {
 			return roleArn, nil
 		}
-		return "", fmt.Errorf("no role-arn configured for %s", accountID)
+		return "", &AccountError{accountID, ErrNoRoleArn}
 	}
-	return "", fmt.Errorf("unknown account: %s", accountID)
+	return "", &AccountError{accountID, ErrUnknownAccountID}
 }
 
-func (config Config) SerialNumber(accountID string) (string, error) {
-	account, ok := config.accounts[accountID]
+func (c config) serialNumber(accountID string) (string, bool, error) {
+	account, ok := c.Accounts[accountID]
 	if ok {
-		serialNumber := account["serial-number"]
-		return serialNumber, nil
+		serialNumber, ok := account["serial-number"]
+		return serialNumber, ok, nil
 	}
-	return "", fmt.Errorf("unknown account: %s", accountID)
+	return "", false, &AccountError{accountID, ErrUnknownAccountID}
 }
 
-func (config Config) DurationSeconds(accountID string) (int32, error) {
-	account, ok := config.accounts[accountID]
+func (c config) durationSeconds(accountID string) (int32, bool, error) {
+	account, ok := c.Accounts[accountID]
 	if ok {
-		durationSeconds, err := strconv.ParseInt(account["duration-seconds"], 10, 32)
-		return int32(durationSeconds), err
+		if durationSeconds, ok := account["duration-seconds"]; ok {
+			res, err := strconv.ParseInt(durationSeconds, 10, 32)
+			return int32(res), ok, err
+		}
+		return 0, false, nil
 	}
-	return -1, fmt.Errorf("unknown account: %s", accountID)
+	return 0, false, &AccountError{accountID, ErrUnknownAccountID}
 }

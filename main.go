@@ -33,8 +33,8 @@ func main() {
 	args := getopt.Args()
 
 	if help {
-	    getopt.Usage()
-        os.Exit(1)
+		getopt.Usage()
+		os.Exit(1)
 	}
 
 	if len(args) == 0 {
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	if console {
-		url, err := awsLogin.Console(accountID, destination, durationSeconds)
+		url, _, err := awsLogin.Console(accountID, destination, durationSeconds)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to generate console link: %v\n", err)
 			os.Exit(1)
@@ -60,7 +60,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	credentials, err := awsLogin.Credentials(accountID, durationSeconds)
+	credentials, _, err := awsLogin.Credentials(accountID, durationSeconds)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to get credentials: %v\n", err)
 		os.Exit(1)
