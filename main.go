@@ -1,33 +1,32 @@
 package main
 
 import (
+	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 
-	"github.com/garymacindoe/aws-login/awslogin"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/pborman/getopt/v2"
 )
 
 func main() {
-	var awsConfigDir, set = os.LookupEnv("AWS_CONFIG_DIR")
-	if !set {
-		awsConfigDir = filepath.Join(os.Getenv("HOME"), ".aws")
-	}
-	var cacheDirectory = awsConfigDir
-	var configFile = filepath.Join(awsConfigDir, "aws-login.yaml")
 	var console = false
 	var destination = "https://console.aws.amazon.com/"
+	var sessionDuration int32 = 0
 	var help = false
-	var durationSeconds int32 = 3600
 
-	getopt.FlagLong(&cacheDirectory, "cache-directory", 0, "use <cache-directory> to cache credentials (can be overridden by setting ${AWS_CONFIG_DIR})")
-	getopt.FlagLong(&configFile, "config-file", 0, "read account IDs, role ARNs and MFA device serial numbers from <config-file> (default ${AWS_CONFIG_DIR}/aws-login.yaml)")
 	getopt.FlagLong(&console, "console", 0, "print a link to the AWS console on standard output")
 	getopt.FlagLong(&destination, "destination", 0, "the AWS Console URL to redirect to after authenticating")
+	getopt.FlagLong(&sessionDuration, "session-duration", 0, "duration of the console session")
 	getopt.FlagLong(&help, "help", 'h', "print this help and exit")
-	getopt.FlagLong(&durationSeconds, "duration-seconds", 0, "request credentials valid for at least <duration-seconds> seconds")
 
 	getopt.Parse()
 	args := getopt.Args()
@@ -44,26 +43,67 @@ func main() {
 
 	accountID := args[0]
 
-	awsLogin, err := awslogin.MakeAWSLogin(cacheDirectory, configFile)
+	cfg, err := awsConfig.LoadDefaultConfig(
+		context.TODO(),
+		awsConfig.WithSharedConfigProfile(accountID),
+		awsConfig.WithAssumeRoleCredentialOptions(func(o *stscreds.AssumeRoleOptions) {
+			o.TokenProvider = stdinTokenProvider
+		}))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to create AWSLogin: %v\n", err)
+		fmt.Fprintf(os.Stderr, "unable to get credentials: %v\n", err)
+		os.Exit(1)
+	}
+	var credentials aws.Credentials
+	if credentials, err = cfg.Credentials.Retrieve(context.TODO()); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get credentials: %v\n", err)
 		os.Exit(1)
 	}
 
 	if console {
-		url, _, err := awsLogin.Console(accountID, destination, durationSeconds)
+		// https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_enable-console-custom-url.html
+		var request = "https://signin.aws.amazon.com/federation?Action=getSigninToken"
+
+		session, err := json.Marshal(map[string]string{
+			"sessionId":    credentials.AccessKeyID,
+			"sessionKey":   credentials.SecretAccessKey,
+			"sessionToken": credentials.SessionToken,
+		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to generate console link: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to marshal session: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println(url)
-		os.Exit(0)
-	}
+		request += "&Session=" + url.QueryEscape(string(session))
 
-	credentials, _, err := awsLogin.Credentials(accountID, durationSeconds)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to get credentials: %v\n", err)
-		os.Exit(1)
+		if sessionDuration > 0 {
+			request += fmt.Sprintf("&SessionDuration=%d", sessionDuration)
+		}
+
+		resp, err := http.Get(request)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to fetch URL: %v\n", err)
+			os.Exit(1)
+		}
+
+		defer resp.Body.Close()
+
+		var response map[string]interface{}
+		if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to decode response: %v\n", err)
+			os.Exit(1)
+		}
+
+		signinToken, ok := response["SigninToken"]
+		if !ok {
+			fmt.Fprintln(os.Stderr, "Response does not contain SigninToken")
+			os.Exit(1)
+		}
+
+		fmt.Println("https://signin.aws.amazon.com/federation" +
+			"?Action=login" +
+			"&Issuer=aws-login" +
+			"&SigninToken=" + signinToken.(string) +
+			"&Destination=" + url.QueryEscape(destination))
+		os.Exit(0)
 	}
 
 	env := map[string]string{
@@ -92,4 +132,14 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+func stdinTokenProvider() (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	// Enter MFA code for arn:aws:iam::032368440683:mfa/gary.macindoe@bbc.co.uk:
+	if _, err := fmt.Fprintln(os.Stderr, "Enter MFA Token:"); err != nil {
+		return "", err
+	}
+	tokenCode, err := reader.ReadString('\n')
+	return strings.Trim(tokenCode, "\n"), err
 }
